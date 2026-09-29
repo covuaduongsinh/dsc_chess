@@ -196,22 +196,45 @@ function showToast(msg) {
 }
 
 // ---------- Clipboard (với fallback) ----------
+function showCopyFallback(text, containerEl, reason) {
+  console.warn("dsc_chess chess-fen-builder: clipboard API không dùng được, dùng fallback:", reason);
+  const ta = document.createElement("textarea");
+  ta.className = "copy-fallback";
+  ta.readOnly = true;
+  ta.value = text;
+  containerEl.appendChild(ta);
+  ta.focus();
+  ta.select();
+  showToast("Không tự copy được — hãy bấm Ctrl+C trong ô vừa hiện ra");
+}
+
 async function copyToClipboard(text, containerEl) {
   const existingFallback = containerEl.querySelector(".copy-fallback");
   if (existingFallback) existingFallback.remove();
+
+  // navigator.clipboard.writeText() có thể TREO VÔ THỜI HẠN (không resolve, không
+  // reject) trong một số hoàn cảnh — ví dụ tab không có focus lúc gọi — dù quyền
+  // clipboard-write báo "granted" (đã quan sát thực tế khi kiểm thử). try/catch một
+  // mình không đủ để bắt trường hợp này vì promise không bao giờ settle. Đua với 1
+  // timeout ngắn để luôn đảm bảo người dùng thấy phản hồi (thành công hoặc fallback),
+  // không bao giờ im lặng không có gì xảy ra.
+  const TIMEOUT_MS = 1500;
+  const timeout = new Promise((resolve) =>
+    setTimeout(() => resolve("timeout"), TIMEOUT_MS)
+  );
+
   try {
-    await navigator.clipboard.writeText(text);
-    showToast("Đã sao chép vào clipboard");
+    const outcome = await Promise.race([
+      navigator.clipboard.writeText(text).then(() => "ok"),
+      timeout,
+    ]);
+    if (outcome === "ok") {
+      showToast("Đã sao chép vào clipboard");
+    } else {
+      showCopyFallback(text, containerEl, "clipboard API không phản hồi sau " + TIMEOUT_MS + "ms");
+    }
   } catch (e) {
-    console.warn("dsc_chess chess-fen-builder: clipboard API bị chặn, dùng fallback", e);
-    const ta = document.createElement("textarea");
-    ta.className = "copy-fallback";
-    ta.readOnly = true;
-    ta.value = text;
-    containerEl.appendChild(ta);
-    ta.focus();
-    ta.select();
-    showToast("Không tự copy được — hãy bấm Ctrl+C trong ô vừa hiện ra");
+    showCopyFallback(text, containerEl, e);
   }
 }
 
