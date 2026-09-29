@@ -151,6 +151,31 @@ phục hồi, và xác nhận cú click đó **chưa hề đăng ký** (vị tr�
 → kết luận đây là chập chờn của bản thân công cụ điều khiển trình duyệt
 (claude-in-chrome), không phải bug trong `dsc_chess_lesson_embed.js`.
 
+## 2026-09-29 — Viết bộ tài liệu AI-agent (`AGENTS.md`/`CLAUDE.md`/`TECH.md`/`MEMORY.md`/`SKILLS.md`)
+
+Theo yêu cầu người dùng: đúc kết toàn bộ kiến trúc, thuật toán, lịch sử sự cố của phiên
+làm việc này thành bộ tài liệu chuẩn cho AI agent, làm nền tảng rà soát/mở rộng và mẫu
+để nhân bản khi xây thêm custom app khác cho DSC. Cũng tạo `AGENTS.md`/`CLAUDE.md`/
+`MEMORY.md` cấp hệ thống (ở repo `erpnext`, không phải repo này) làm lớp chỉ mục cho
+toàn bộ `docs/book`/`docs/plans` đã có — không lặp lại nội dung, chỉ trỏ tới.
+
+## 2026-09-29 — Xác nhận Dockerfile mới build thành công (hoàn tất việc còn dang dở)
+
+Build image từ Dockerfile mới dưới 1 **tag thử nghiệm riêng**
+(`erpnext-custom:v15-rebuild-test`, không đụng tag production) ngay trên VPS —
+`docker build` một mình không ảnh hưởng gì container đang chạy (chỉ `docker compose up
+-d` sau đó mới recreate container theo image mới). Kết quả: build thành công (exit
+code 0), `RUN` block của `dsc_chess` chạy đúng từ đầu tới `grep -q` cuối cùng. Xác minh
+thêm bằng cách chạy `docker run --rm <test-image> cat .../_lms.html` — đọc trực tiếp
+thấy đúng 2 thẻ `<script>`/`<link>` đã được chèn. Đã xoá image thử nghiệm sau khi xác
+nhận xong.
+
+**Quyết định có chủ đích: chưa swap image này vào production** (đổi tag +
+`docker compose up -d`) — vì `education`/`crm`/`payments`/`lms` được clone theo tên
+nhánh (không ghim commit), 1 lần build mới có thể vô tình kéo theo thay đổi upstream
+không liên quan tới `dsc_chess` mà chưa kiểm thử. Việc "Dockerfile đúng và build được"
+(mục tiêu ban đầu) đã xong; việc "có nên deploy ngay hay để dành" là quyết định khác.
+
 ## Quyết định chưa hoàn tất / còn bỏ ngỏ (để không quên)
 
 - **Chưa vendor `cm-chessboard`/`chess.js` cục bộ** — đang phụ thuộc CDN jsDelivr lúc
@@ -158,8 +183,11 @@ phục hồi, và xác nhận cú click đó **chưa hề đăng ký** (vị tr�
   `cm-chessboard` không có bản single-file chính thức, vendor đúng cách tốn công hơn
   giá trị nhận được ở quy mô hiện tại. Nếu DSC mở rộng nhiều và cần độc lập CDN, đây là
   việc cần làm lại.
-- **Chưa xác nhận Dockerfile build thành công từ đầu** trên 1 lần rebuild thật (không
-  có staging để thử trước).
+- **Đã deploy production vẫn đang chạy trên trạng thái "live-patched" (qua docker
+  exec/cp), chưa được rebuild lại từ image mới đã xác nhận.** Không sao (2 trạng thái
+  tương đương về mặt chức năng), nhưng nếu muốn image production thực sự khớp 100% với
+  Dockerfile trong repo, cần 1 lần `docker compose build` + `up -d` thật (xem cân nhắc
+  rủi ro ở mục ngay phía trên).
 - **Cú pháp PGN đa dòng/đầy đủ header** — chưa làm, cần spike riêng trước (xem
   `TECH.md` mục 3.2).
 - **Công cụ authoring `/chess-fen-builder`** — ý tưởng đã có trong kế hoạch gốc, chưa

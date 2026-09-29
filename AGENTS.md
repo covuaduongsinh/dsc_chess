@@ -104,7 +104,11 @@ năng nằm trong 1 file JS + hooks.py 3 dòng.
 
 ## 6. Việc còn dang dở (tính đến 2026-09-29)
 
-- Xác nhận Dockerfile mới build thành công qua một lần rebuild image thật (chưa làm,
-  vì không có staging — xem `MEMORY.md`).
+- Dockerfile đã được xác nhận build thành công (test qua tag riêng, không đụng
+  production — xem `MEMORY.md`), nhưng **chưa swap vào production** (production hiện
+  chạy ở trạng thái "live-patched" qua `docker exec`/`docker cp`, tương đương về chức
+  năng nhưng chưa khớp 100% với đúng image mà Dockerfile sẽ tạo ra). Deploy thật sự
+  (đổi tag + `docker compose up -d`) để dành cho lần cần nâng cấp app khác, tránh kéo
+  theo thay đổi upstream chưa kiểm thử từ các app dùng tên nhánh không ghim commit.
 - Công cụ authoring `/chess-fen-builder` (bàn cờ kéo-thả tạo nhanh FEN, chưa triển khai).
 - Cú pháp PGN đa dòng đầy đủ header tags (hiện chỉ hỗ trợ 1 dòng, chỉ movetext).
