@@ -176,6 +176,34 @@ nhánh (không ghim commit), 1 lần build mới có thể vô tình kéo theo t
 không liên quan tới `dsc_chess` mà chưa kiểm thử. Việc "Dockerfile đúng và build được"
 (mục tiêu ban đầu) đã xong; việc "có nên deploy ngay hay để dành" là quyết định khác.
 
+## 2026-09-29 — Xây trang công cụ `/chess-fen-builder`
+
+Kế hoạch riêng: `docs/plans/chess_fen_builder_tool_plan.md` (repo `erpnext`). Kết quả:
+đã triển khai và xác nhận hoạt động đầy đủ, chi tiết đầy đủ nằm ở
+`docs/plans/chess_fen_builder_tool_completion_report.md` — tóm tắt các điểm đáng nhớ:
+
+- **Cả 2 "điểm cần thử nghiệm" nêu trong kế hoạch đều đúng như thiết kế:** click qua
+  `data-square` xác định đúng ô (xem `TECH.md` mục 8.1); `getHeaders().Result` của
+  `chess.js` vẫn trả đúng kết quả dù PGN không có header nào khác — edge-case tinh vi
+  từng lo ngại không xảy ra trên thực tế (xem `TECH.md` mục 8.2).
+- **Phát hiện mới ngoài dự kiến, đã sửa:** `navigator.clipboard.writeText()` có thể
+  treo vô thời hạn (không resolve, không reject) dù quyền báo "granted" — đã thêm
+  `Promise.race` với timeout 1.5s để luôn đảm bảo có phản hồi cho người dùng (xem
+  `TECH.md` mục 8.3). Nguyên tắc này nên áp dụng cho mọi chỗ dùng Clipboard API sau này
+  trong app, không chỉ trang này.
+- **Xác nhận đúng suy luận kiến trúc:** route `www/*.html` chỉ cần đồng bộ container
+  `erpnext-backend`, KHÔNG cần `erpnext-frontend` (khác với tính năng nhúng cần cả 2) —
+  xác nhận bằng `curl` trả 200 ngay sau `git pull`, không cần `bench clear-cache`.
+- **Bước xác nhận quan trọng nhất đã qua:** dựng thế cờ trong builder → copy marker →
+  dán vào 1 lesson thật → hiện đúng y hệt ở giao diện học viên — xác nhận 2 tính năng
+  (`chess-fen-builder` và `dsc_chess_lesson_embed.js`) tương thích định dạng hoàn toàn.
+- **Bài học phụ về công cụ test:** trong lúc kiểm thử bằng trình duyệt tự động hoá
+  (claude-in-chrome), toạ độ ước lượng bằng mắt từ ảnh chụp màn hình từng lệch hơn 1 ô
+  cờ so với toạ độ CSS pixel thật — không phải lỗi của trang, chỉ là lệch tỷ lệ giữa
+  ảnh chụp và không gian toạ độ click của chính công cụ tự động hoá. Khi cần độ chính
+  xác cao lúc test loại UI kiểu "click vào đúng 1 ô nhỏ", nên lấy toạ độ qua
+  `getBoundingClientRect()` trước rồi mới click, thay vì ước lượng từ ảnh.
+
 ## Quyết định chưa hoàn tất / còn bỏ ngỏ (để không quên)
 
 - **Chưa vendor `cm-chessboard`/`chess.js` cục bộ** — đang phụ thuộc CDN jsDelivr lúc
@@ -190,5 +218,7 @@ không liên quan tới `dsc_chess` mà chưa kiểm thử. Việc "Dockerfile �
   rủi ro ở mục ngay phía trên).
 - **Cú pháp PGN đa dòng/đầy đủ header** — chưa làm, cần spike riêng trước (xem
   `TECH.md` mục 3.2).
-- **Công cụ authoring `/chess-fen-builder`** — ý tưởng đã có trong kế hoạch gốc, chưa
-  triển khai.
+- **Trang `/chess-fen-builder`:** chưa test responsive mobile trực quan, chưa test
+  end-to-end marker PGN sinh từ chính trang (đã test marker FEN sinh từ trang; marker
+  PGN dùng chung định dạng đã test kỹ ở tính năng nhúng — rủi ro thấp nhưng chưa lặp
+  lại bước cuối này).

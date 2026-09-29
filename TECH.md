@@ -275,3 +275,88 @@ tại để patch — xem mục 4).
 
 `apps.txt` (`/etc/dokploy/compose/erpnext-prod/data/sites/apps.txt`) nằm trên volume
 dữ liệu, **không bị mất khi rebuild image** — chỉ cần thêm 1 lần.
+
+## 8. Trang công cụ `chess-fen-builder.html` — kiến trúc khác hẳn mục 3-4
+
+File: `dsc_chess/www/chess-fen-builder.html`. Đây là 1 route Frappe **hoàn toàn bình
+thường** (`www/*.html` tự route theo tên file), khác biệt rõ ràng với cơ chế nhúng đã
+mô tả ở mục 2-4 — đừng nhầm lẫn 2 cơ chế:
+
+| | `dsc_chess_lesson_embed.js` (mục 2-4) | `chess-fen-builder.html` (mục này) |
+|---|---|---|
+| Route | Mọi trang `/lms/*` (SPA của app khác) | 1 route riêng `/chess-fen-builder` (của chính `dsc_chess`) |
+| Cách nạp | Patch `_lms.html` tại build-time (vì `web_include_js` không chạm tới SPA) | Không cần patch gì — Frappe tự phục vụ `www/*.html`, không cần sửa `hooks.py` |
+| Nạp thư viện | `import()` động, lazy, chỉ khi tìm thấy marker | `<script type="module">` tĩnh, nạp ngay khi vào trang |
+| Cần `bench build`? | Không (asset tĩnh qua symlink) | Không (file `.html` đọc trực tiếp, không phải asset qua `web_include_js`) |
+| Container cần đồng bộ khi deploy | `erpnext-backend` (đọc/patch `_lms.html`) + `erpnext-frontend` (serve JS/CSS tĩnh) | **Chỉ `erpnext-backend`** — đã xác nhận bằng `curl` (route không khớp static path, luôn proxy qua Python) |
+
+### 8.1. Vì sao không dùng `enableMoveInput`/`validateMoveInput` của cm-chessboard
+
+Hệ thống move-input của `cm-chessboard` chỉ dùng để validate việc DI CHUYỂN 1 quân đã
+có trên bàn — không hỗ trợ chọn loại quân MỚI để đặt vào ô trống (không có "chế độ board
+editor" dựng sẵn, đã xác nhận qua đọc trực tiếp mã nguồn `Chessboard.js`/
+`VisualMoveInput.js`, không có `MOVE_INPUT_MODE` cho phép đặt quân tự do).
+
+**Cách làm đúng:** dùng trực tiếp API thao tác vị trí (`setPiece`, `getPiece`,
+`getPosition`, `setPosition`), bắt sự kiện click bằng event delegation trên container
+bàn cờ:
+
+```js
+boardContainerEl.addEventListener("click", (event) => {
+  const squareEl = event.target.closest("[data-square]");
+  if (!squareEl) return;
+  const square = squareEl.getAttribute("data-square");
+  board.setPiece(square, selectedPiece /* null = xoá */, false);
+});
+```
+
+Đã xác nhận qua đếm số phần tử: bàn cờ vị trí khởi đầu có đúng **96** phần tử
+`[data-square]` (= 64 ô + 32 quân, mỗi quân cũng tự mang `data-square` riêng nên
+`closest()` luôn trả đúng ô dù click trúng ô trống hay trúng quân đang đứng trên đó).
+
+### 8.2. Chuẩn hoá PGN thành 1 dòng — tái dùng nguyên tắc ở mục 3.2
+
+Cùng lý do đã giải thích ở mục 3.2 (marker phải là text thuần, PGN phải 1 dòng để né
+`markdown-it` hiểu nhầm số thứ tự nước đi thành danh sách) — trang này tự động hoá việc
+đó thay vì bắt giảng viên tự làm tay:
+
+```js
+const chess = new Chess();
+chess.loadPgn(rawText, { strict: false });        // chấp nhận PGN nhiều dòng, có header
+const sanMoves = chess.history();                  // KHÔNG {verbose:true} — mảng SAN thuần
+const movetext = sanMoves
+  .map((san, i) => (i % 2 === 0 ? `${i / 2 + 1}. ${san}` : san))
+  .join(" ");
+// chess.pgn() LUÔN kèm header, KHÔNG dùng được để lấy movetext trần — phải tự ghép
+// từ history() như trên.
+let result = chess.getHeaders().Result;             // hoặc fallback regex trên rawText
+```
+
+**Đã xác nhận qua test thực tế (không phải lý thuyết):** `getHeaders().Result` trả
+đúng giá trị `"1-0"` ngay cả khi PGN gốc HOÀN TOÀN không có header tag nào khác (chỉ có
+`1-0` ở cuối movetext) — edge-case từng lo ngại lúc lập kế hoạch không xảy ra trên thực
+tế với `chess.js` 1.4.0. Chi tiết 3 case đã test: xem
+`docs/plans/chess_fen_builder_tool_completion_report.md` (repo `erpnext`) mục 2.2.
+
+### 8.3. `navigator.clipboard.writeText()` có thể treo vô thời hạn — luôn đua với timeout
+
+Phát hiện quan trọng khi test thực tế: hàm này có thể **không bao giờ resolve lẫn
+không reject**, dù `navigator.permissions.query({name:'clipboard-write'})` báo
+`"granted"` (quan sát được trong môi trường trình duyệt tự động hoá, khả năng liên
+quan tới việc tab không có focus thật — spec Clipboard API yêu cầu document có focus).
+`try/catch` một mình KHÔNG bắt được trường hợp này vì promise không bao giờ settle.
+
+**Bắt buộc đua với `Promise.race` + timeout** để đảm bảo người dùng luôn thấy phản hồi
+(toast thành công hoặc fallback textarea để tự Ctrl+C), không bao giờ im lặng:
+
+```js
+const outcome = await Promise.race([
+  navigator.clipboard.writeText(text).then(() => "ok"),
+  new Promise((resolve) => setTimeout(() => resolve("timeout"), 1500)),
+]);
+if (outcome === "ok") showToast("Đã sao chép vào clipboard");
+else showCopyFallback(text, containerEl);   // textarea readonly đã select() sẵn
+```
+
+Nguyên tắc này áp dụng cho MỌI lần dùng Clipboard API trong các trang/tính năng khác
+của `dsc_chess` sau này — không chỉ riêng trang này.

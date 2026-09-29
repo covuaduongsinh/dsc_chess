@@ -55,7 +55,7 @@ dsc_chess/
 │   ├── public/
 │   │   ├── js/dsc_chess_lesson_embed.js       # Toàn bộ logic — xem TECH.md mục 3
 │   │   └── css/dsc_chess_lesson_embed.css
-│   └── www/                                   # (dự kiến) chess-fen-builder.html — chưa làm
+│   └── www/chess-fen-builder.html             # Công cụ tạo FEN/chuẩn hoá PGN — xem TECH.md mục 8
 ├── AGENTS.md / CLAUDE.md / README.md / TECH.md / MEMORY.md / SKILLS.md
 ├── pyproject.toml
 └── license.txt
@@ -79,6 +79,12 @@ năng nằm trong 1 file JS + hooks.py 3 dòng.
    `erpnext-backend` VÀ `erpnext-frontend`** (2 container này phục vụ nội dung/asset
    cho web) — không cần `bench build` lại vì `web_include_js` trỏ thẳng tới path gốc,
    không qua bundler.
+4b. Khi thêm/sửa 1 trang `www/*.html` thuần (như `chess-fen-builder.html`) — khác với
+   mục 4: route này luôn được nginx proxy qua Python (`try_files ... @webserver` không
+   khớp path tĩnh), nên **chỉ cần đồng bộ vào `erpnext-backend`**, KHÔNG cần
+   `erpnext-frontend` (đã xác nhận thực tế bằng `curl` khi làm `chess-fen-builder.html`
+   — xem `MEMORY.md`). Vẫn nên `curl` kiểm chứng lại mỗi lần, đừng coi là quy tắc tuyệt
+   đối nếu route có đặc thù khác (ví dụ có file `.py` context riêng).
 5. Khi thêm dependency Python hoặc đổi `hooks.py`: xem lại toàn bộ mục 2.3 ở trên,
    PHẢI cài vào mọi container Python trước.
 6. Sau khi xác nhận hoạt động đúng trên production (live, qua docker exec/cp): cập
@@ -110,5 +116,8 @@ năng nằm trong 1 file JS + hooks.py 3 dòng.
   năng nhưng chưa khớp 100% với đúng image mà Dockerfile sẽ tạo ra). Deploy thật sự
   (đổi tag + `docker compose up -d`) để dành cho lần cần nâng cấp app khác, tránh kéo
   theo thay đổi upstream chưa kiểm thử từ các app dùng tên nhánh không ghim commit.
-- Công cụ authoring `/chess-fen-builder` (bàn cờ kéo-thả tạo nhanh FEN, chưa triển khai).
 - Cú pháp PGN đa dòng đầy đủ header tags (hiện chỉ hỗ trợ 1 dòng, chỉ movetext).
+- Trang `/chess-fen-builder`: chưa test responsive mobile trực quan, chưa test end-to-end
+  marker PGN sinh từ chính trang (đã test marker FEN sinh từ trang; marker PGN dùng
+  chung định dạng đã test kỹ ở tính năng nhúng — rủi ro thấp nhưng chưa lặp lại bước
+  cuối). Xem `docs/plans/chess_fen_builder_tool_completion_report.md` (repo `erpnext`).

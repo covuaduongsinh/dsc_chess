@@ -56,3 +56,18 @@ Trong trình soạn thảo bài học (Portal LMS, **không phải** Desk), tạ
 - `PGN: <toàn bộ nước đi trên 1 dòng, không có header tags>` — hiện ván cờ có thể xem lại.
 
 Lưu bài học, sau đó xem lại ở giao diện học viên (không hiện ngay trong lúc soạn).
+
+## Công cụ hỗ trợ tạo FEN/PGN: `/chess-fen-builder`
+
+Không cần tự gõ tay chuỗi FEN/PGN — vào
+[`erpnext.dsc.edu.vn/chess-fen-builder`](https://erpnext.dsc.edu.vn/chess-fen-builder)
+(public, không cần đăng nhập):
+
+- **Tab "Tạo FEN từ bàn cờ":** chọn 1 quân trong bảng bên trái, click vào bàn cờ để đặt
+  (chọn "Xoá quân" để xoá), chọn bên đi trước, bấm **"Sao chép marker FEN"** — dán
+  thẳng vào block editor của bài học.
+- **Tab "Chuẩn hoá PGN":** dán PGN gốc (lấy từ lichess, chess.com, phần mềm quản lý ván
+  đấu... — có header hay không đều được) rồi bấm **"Chuẩn hoá & Sao chép marker PGN"**
+  — công cụ tự rút gọn thành đúng định dạng 1 dòng mà bài học yêu cầu.
+
+Chi tiết kỹ thuật: [`TECH.md`](./TECH.md) mục 8.
