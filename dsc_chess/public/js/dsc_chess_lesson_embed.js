@@ -59,16 +59,22 @@
 
   function findMarkerElements(root) {
     var out = [];
-    var nodes = root.querySelectorAll("p, div, span");
+    // Chỉ xét node "lá" (children.length === 0) để giảm số phần tử phải kiểm tra
+    // và tránh xử lý trùng cha/con. Dùng textContent (KHÔNG dùng innerText — innerText
+    // buộc trình duyệt tính lại layout đồng bộ cho từng phần tử, rất tốn kém khi quét
+    // hàng trăm node mỗi lần DOM thay đổi, từng gây treo trang biên tập bài học).
+    var nodes = root.querySelectorAll("p, div");
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
+      if (el.children && el.children.length > 0) continue;
       if (mounted.has(el)) continue;
       if (el.closest && el.closest("[data-dsc-chess]")) continue;
-      // Chỉ xét node "lá" (không chứa element con khác cùng loại) để tránh xử lý trùng
-      // khi cha/con đều khớp querySelectorAll.
-      if (el.children && el.children.length > 0) continue;
-      var text = (el.innerText || el.textContent || "").trim();
-      if (!text) continue;
+      var raw = el.textContent;
+      if (!raw || raw.length < 5 || raw.length > 4000) continue;
+      // So khớp nhanh trước khi trim/regex đầy đủ để tránh xử lý dư thừa.
+      if (raw.indexOf("FEN:") === -1 && raw.indexOf("fen:") === -1 &&
+          raw.indexOf("PGN:") === -1 && raw.indexOf("pgn:") === -1) continue;
+      var text = raw.trim();
       var m = RE_FEN.exec(text);
       if (m) {
         out.push({ el: el, type: "fen", value: m[1].trim() });
@@ -221,7 +227,7 @@
     }
   }
 
-  var debouncedScan = debounce(scan, 200);
+  var debouncedScan = debounce(scan, 400);
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", scan);
