@@ -1,0 +1,52 @@
+.dsc-chess-board {
+  max-width: 420px;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.dsc-chess-pgn {
+  max-width: 420px;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.dsc-chess-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dsc-chess-controls button {
+  padding: 4px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.dsc-chess-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dsc-chess-controls button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.dsc-chess-move-label {
+  font-size: 13px;
+  color: #4b5563;
+  flex: 1;
+  text-align: center;
+}
+
+.dsc-chess-error {
+  padding: 10px 12px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 6px;
+  font-size: 13px;
+}
