@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Công cụ tạo FEN / PGN — DSC Chess</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@8.15.1/assets/chessboard.css">
+<style>
+  :root {
+    --border: #d1d5db;
+    --bg-soft: #f3f4f6;
+    --accent: #16a34a;
+    --accent-dark: #15803d;
+    --error-bg: #fef2f2;
+    --error-border: #fca5a5;
+    --error-text: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 16px;
+    color: #111827;
+    background: #fff;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.subtitle { color: #6b7280; margin: 0 0 20px; font-size: 14px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+  .tab-btn {
+    padding: 8px 16px; border: none; background: none; cursor: pointer;
+    font-size: 14px; color: #6b7280; border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+  }
+  .tab-btn.active { color: var(--accent-dark); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .editor-layout { display: flex; gap: 24px; flex-wrap: wrap; }
+  .palette {
+    display: grid; grid-template-columns: repeat(2, 44px); gap: 6px;
+    align-content: start;
+  }
+  .palette button {
+    width: 44px; height: 44px; border: 2px solid var(--border); border-radius: 6px;
+    background: #fff; cursor: pointer; padding: 0; display: flex;
+    align-items: center; justify-content: center; font-size: 28px; line-height: 1;
+  }
+  .palette button.active { border-color: var(--accent); background: #f0fdf4; }
+  .palette .eraser {
+    grid-column: span 2; height: 36px; font-size: 13px; color: #374151;
+  }
+  .board-col { flex: 1; min-width: 280px; }
+  #board-editor, #board-pgn-preview { width: 320px; max-width: 100%; }
+
+  .controls-row { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  button.btn {
+    padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 13px;
+  }
+  button.btn:hover { background: var(--bg-soft); }
+  button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent-dark); }
+  button.btn.primary:hover { background: var(--accent-dark); }
+
+  .side-radio { margin-top: 14px; font-size: 14px; }
+  .side-radio label { margin-right: 16px; cursor: pointer; }
+
+  .preview-box {
+    margin-top: 14px; padding: 10px 12px; background: var(--bg-soft);
+    border-radius: 6px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px; word-break: break-all; min-height: 20px;
+  }
+
+  textarea {
+    width: 100%; min-height: 140px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
+    resize: vertical;
+  }
+
+  .error-box {
+    margin-top: 10px; padding: 10px 12px; background: var(--error-bg);
+    border: 1px solid var(--error-border); color: var(--error-text);
+    border-radius: 6px; font-size: 13px; display: none;
+  }
+  .error-box.show { display: block; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #111827; color: #fff; padding: 8px 16px; border-radius: 20px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; }
+
+  .copy-fallback {
+    margin-top: 8px; width: 100%; font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px; padding: 8px; border: 1px dashed var(--border); border-radius: 6px;
+  }
+
+  @media (max-width: 640px) {
+    .editor-layout { flex-direction: column; }
+    .palette { grid-template-columns: repeat(6, 44px); }
+  }
+</style>
+</head>
+<body>
+
+<h1>Công cụ tạo FEN / PGN — DSC Chess</h1>
+<p class="subtitle">
+  Dựng thế cờ hoặc dán ván đấu để tạo sẵn dòng marker dán vào bài học LMS
+  (<code>FEN: ...</code> / <code>PGN: ...</code>).
+</p>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="tab-fen">Tạo FEN từ bàn cờ</button>
+  <button class="tab-btn" data-tab="tab-pgn">Chuẩn hoá PGN</button>
+</div>
+
+<!-- TAB 1: FEN builder -->
+<div id="tab-fen" class="tab-panel active">
+  <div class="editor-layout">
+    <div class="palette" id="palette"></div>
+    <div class="board-col">
+      <div id="board-editor"></div>
+      <div class="side-radio">
+        Bên đi trước:
+        <label><input type="radio" name="side" value="w" checked> Trắng</label>
+        <label><input type="radio" name="side" value="b"> Đen</label>
+      </div>
+      <div class="controls-row">
+        <button class="btn" id="btn-reset-start">Vị trí bắt đầu chuẩn</button>
+        <button class="btn" id="btn-clear-board">Xoá hết quân</button>
+      </div>
+      <div class="preview-box" id="fen-preview">rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1</div>
+      <div class="controls-row">
+        <button class="btn primary" id="btn-copy-fen">Sao chép marker FEN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: PGN normalizer -->
+<div id="tab-pgn" class="tab-panel">
+  <label for="pgn-input" style="display:block; margin-bottom:6px; font-size:14px;">
+    Dán PGN gốc vào đây (có header hay không đều được):
+  </label>
+  <textarea id="pgn-input" placeholder='[Event "Ván mẫu"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O 1-0'></textarea>
+  <div class="controls-row">
+    <button class="btn primary" id="btn-normalize-pgn">Chuẩn hoá &amp; Sao chép marker PGN</button>
+  </div>
+  <div class="error-box" id="pgn-error"></div>
+  <div class="preview-box" id="pgn-preview" style="display:none;"></div>
+  <div id="pgn-board-wrap" style="display:none; margin-top:14px;">
+    <div id="board-pgn-preview"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { Chessboard } from "https://cdn.jsdelivr.net/npm/cm-chessboard@8.15.1/src/Chessboard.js";
+import { Chess } from "https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js";
+
+const CDN_ASSETS_URL = "https://cdn.jsdelivr.net/npm/cm-chessboard@8.15.1/assets/";
+// Dùng FEN đầy đủ 6 trường (giống cách dsc_chess_lesson_embed.js đã dùng và xác nhận
+// hoạt động đúng trên production) thay vì chỉ phần piece-placement, để tránh phụ
+// thuộc vào việc cm-chessboard có tự xử lý chuỗi rút gọn hay không.
+const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
+const PIECE_CODES = ["wk", "wq", "wr", "wb", "wn", "wp", "bk", "bq", "br", "bb", "bn", "bp"];
+// Ký hiệu Unicode cờ vua chuẩn — dùng trực tiếp làm nhãn palette thay vì phụ thuộc
+// cấu trúc nội bộ của file SVG sprite quân cờ (không chắc dùng được qua <img src="...#id">
+// nếu sprite định nghĩa dạng <symbol>/<g>, vốn chỉ dùng được qua <use> bên trong SVG).
+const PIECE_GLYPHS = {
+  wk: "♔", wq: "♕", wr: "♖", wb: "♗", wn: "♘", wp: "♙",
+  bk: "♚", bq: "♛", br: "♜", bb: "♝", bn: "♞", bp: "♟",
+};
+const PIECE_LABELS = {
+  wk: "Vua trắng", wq: "Hậu trắng", wr: "Xe trắng", wb: "Tượng trắng",
+  wn: "Mã trắng", wp: "Tốt trắng",
+  bk: "Vua đen", bq: "Hậu đen", br: "Xe đen", bb: "Tượng đen",
+  bn: "Mã đen", bp: "Tốt đen",
+};
+
+// ---------- Toast ----------
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove("show"), 2000);
+}
+
+// ---------- Clipboard (với fallback) ----------
+async function copyToClipboard(text, containerEl) {
+  const existingFallback = containerEl.querySelector(".copy-fallback");
+  if (existingFallback) existingFallback.remove();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Đã sao chép vào clipboard");
+  } catch (e) {
+    console.warn("dsc_chess chess-fen-builder: clipboard API bị chặn, dùng fallback", e);
+    const ta = document.createElement("textarea");
+    ta.className = "copy-fallback";
+    ta.readOnly = true;
+    ta.value = text;
+    containerEl.appendChild(ta);
+    ta.focus();
+    ta.select();
+    showToast("Không tự copy được — hãy bấm Ctrl+C trong ô vừa hiện ra");
+  }
+}
+
+// ---------- Tabs ----------
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+// ================= TAB 1: FEN builder =================
+
+let selectedPiece = "wp";
+let boardEditor;
+
+function buildPalette() {
+  const wrap = document.getElementById("palette");
+  PIECE_CODES.forEach((code) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.title = PIECE_LABELS[code];
+    btn.dataset.piece = code;
+    btn.textContent = PIECE_GLYPHS[code];
+    // Quân đen dùng cùng glyph "rỗng" như quân trắng trên một số font hệ thống —
+    // tô màu để phân biệt rõ, không chỉ dựa vào hình dạng glyph.
+    btn.style.color = code[0] === "b" ? "#111827" : "#6b7280";
+    btn.addEventListener("click", () => selectPiece(code, btn));
+    wrap.appendChild(btn);
+  });
+  const eraser = document.createElement("button");
+  eraser.type = "button";
+  eraser.className = "eraser";
+  eraser.textContent = "Xoá quân";
+  eraser.dataset.piece = "";
+  eraser.addEventListener("click", () => selectPiece(null, eraser));
+  wrap.appendChild(eraser);
+  wrap.querySelector('[data-piece="wp"]').classList.add("active");
+}
+
+function selectPiece(code, btnEl) {
+  selectedPiece = code;
+  document.querySelectorAll("#palette button").forEach((b) => b.classList.remove("active"));
+  btnEl.classList.add("active");
+}
+
+function currentSide() {
+  return document.querySelector('input[name="side"]:checked').value;
+}
+
+function refreshFenPreview() {
+  try {
+    const placement = boardEditor.getPosition();
+    const fen = [placement || EMPTY_FEN, currentSide(), "-", "-", "0", "1"].join(" ");
+    document.getElementById("fen-preview").textContent = fen;
+  } catch (e) {
+    console.warn("dsc_chess chess-fen-builder: lỗi đọc vị trí bàn cờ", e);
+  }
+}
+
+function initFenBoard() {
+  boardEditor = new Chessboard(document.getElementById("board-editor"), {
+    position: START_FEN,
+    assetsUrl: CDN_ASSETS_URL,
+  });
+
+  // Click-to-place: KHÔNG dùng enableMoveInput/validateMoveInput (chỉ validate
+  // DI CHUYỂN quân có sẵn, không hỗ trợ chọn loại quân mới để đặt). Thay vào đó
+  // bắt sự kiện click trực tiếp và dùng setPiece — mỗi ô (rỗng hay có quân) đều
+  // có thuộc tính data-square trên phần tử SVG tương ứng.
+  document.getElementById("board-editor").addEventListener("click", (event) => {
+    const squareEl = event.target.closest("[data-square]");
+    if (!squareEl) return;
+    const square = squareEl.getAttribute("data-square");
+    try {
+      boardEditor.setPiece(square, selectedPiece, false);
+      refreshFenPreview();
+    } catch (e) {
+      console.warn("dsc_chess chess-fen-builder: lỗi đặt quân", e, square, selectedPiece);
+    }
+  });
+
+  document.getElementById("btn-reset-start").addEventListener("click", () => {
+    boardEditor.setPosition(START_FEN, true);
+    refreshFenPreview();
+  });
+  document.getElementById("btn-clear-board").addEventListener("click", () => {
+    boardEditor.setPosition(EMPTY_FEN, true);
+    refreshFenPreview();
+  });
+  document.querySelectorAll('input[name="side"]').forEach((r) =>
+    r.addEventListener("change", refreshFenPreview)
+  );
+  document.getElementById("btn-copy-fen").addEventListener("click", () => {
+    const fen = document.getElementById("fen-preview").textContent.trim();
+    copyToClipboard(`FEN: ${fen}`, document.getElementById("tab-fen"));
+  });
+
+  refreshFenPreview();
+}
+
+// ================= TAB 2: PGN normalizer =================
+
+let boardPgnPreview;
+
+function normalizePgn(rawText) {
+  const chess = new Chess();
+  try {
+    chess.loadPgn(rawText, { strict: false });
+  } catch (e) {
+    return { error: `PGN không hợp lệ: ${e.message || e}` };
+  }
+
+  const sanMoves = chess.history();
+  if (!sanMoves.length) {
+    return { error: "Không tìm thấy nước đi hợp lệ nào trong PGN đã dán." };
+  }
+
+  let movetext = sanMoves
+    .map((san, i) => (i % 2 === 0 ? `${Math.floor(i / 2) + 1}. ${san}` : san))
+    .join(" ");
+
+  let result = null;
+  try {
+    result = chess.getHeaders().Result;
+  } catch (e) {
+    console.warn("dsc_chess chess-fen-builder: getHeaders() lỗi", e);
+  }
+  if (!result) {
+    const m = /\[Result\s+"([^"]+)"\]/.exec(rawText);
+    if (m) result = m[1];
+  }
+  if (result && result !== "*") {
+    movetext += ` ${result}`;
+  }
+
+  return { marker: `PGN: ${movetext}`, previewFen: chess.fen() };
+}
+
+function initPgnTab() {
+  const btn = document.getElementById("btn-normalize-pgn");
+  const errorBox = document.getElementById("pgn-error");
+  const previewBox = document.getElementById("pgn-preview");
+  const boardWrap = document.getElementById("pgn-board-wrap");
+
+  btn.addEventListener("click", () => {
+    errorBox.classList.remove("show");
+    previewBox.style.display = "none";
+    boardWrap.style.display = "none";
+
+    const raw = document.getElementById("pgn-input").value.trim();
+    if (!raw) {
+      errorBox.textContent = "Hãy dán nội dung PGN trước.";
+      errorBox.classList.add("show");
+      return;
+    }
+
+    const result = normalizePgn(raw);
+    if (result.error) {
+      errorBox.textContent = result.error;
+      errorBox.classList.add("show");
+      return;
+    }
+
+    previewBox.textContent = result.marker;
+    previewBox.style.display = "block";
+    boardWrap.style.display = "block";
+
+    try {
+      if (!boardPgnPreview) {
+        boardPgnPreview = new Chessboard(document.getElementById("board-pgn-preview"), {
+          position: result.previewFen,
+          assetsUrl: CDN_ASSETS_URL,
+        });
+      } else {
+        boardPgnPreview.setPosition(result.previewFen, true);
+      }
+    } catch (e) {
+      console.warn("dsc_chess chess-fen-builder: lỗi hiện bàn cờ xem trước PGN", e);
+    }
+
+    copyToClipboard(result.marker, document.getElementById("tab-pgn"));
+  });
+}
+
+// ---------- Init ----------
+try {
+  buildPalette();
+  initFenBoard();
+  initPgnTab();
+} catch (e) {
+  console.error("dsc_chess chess-fen-builder: lỗi khởi tạo trang", e);
+  document.body.insertAdjacentHTML(
+    "afterbegin",
+    '<div class="error-box show">Có lỗi khi tải công cụ. Vui lòng tải lại trang hoặc báo quản trị viên.</div>'
+  );
+}
+</script>
+
+</body>
+</html>
